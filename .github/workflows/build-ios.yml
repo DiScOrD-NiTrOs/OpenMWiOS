@@ -16,40 +16,39 @@ jobs:
     timeout-minutes: 360
 
     steps:
-      - name: Checkout
+      - name: Checkout OpenMWiOS
         uses: actions/checkout@v5
+
+      - name: Prepare logs
+        run: mkdir -p logs
+
+      - name: Check project
+        run: |
+          ls -la
+          ls -la scripts
+          test -f scripts/bootstrap.sh
+          test -f scripts/build-ios.sh
 
       - name: Install dependencies
         run: |
           brew install cmake ninja autoconf automake libtool pkg-config
 
-      - name: Clone OpenMW iOS source
+      - name: Bootstrap
         run: |
-          git clone https://gitlab.com/duron27/openmw_ios.git source
-
-      - name: Check source files
-        working-directory: source
-        run: |
-          ls -la
-          test -f scripts/bootstrap.sh
-          test -f scripts/build-ios.sh
-
-      - name: Bootstrap dependencies
-        working-directory: source
-        run: |
-          chmod +x scripts/*.sh
+          chmod +x scripts/bootstrap.sh
           set -o pipefail
-          ./scripts/bootstrap.sh 2>&1 | tee ../bootstrap.log
+          ./scripts/bootstrap.sh 2>&1 | tee logs/bootstrap.log
 
-      - name: Build iOS project
-        working-directory: source
+      - name: Build iOS
         run: |
+          chmod +x scripts/build-ios.sh
           set -o pipefail
-          ./scripts/build-ios.sh 2>&1 | tee ../ios-build.log
+          ./scripts/build-ios.sh 2>&1 | tee logs/build-ios.log
 
-      - name: Check generated Xcode project
-        working-directory: source
+      - name: Inspect generated project
+        if: success()
         run: |
+          ls -la build/ios
           xcodebuild -list \
             -project build/ios/OpenMW.xcodeproj
 
@@ -57,9 +56,9 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v6
         with:
-          name: Morrowind-iOS-diagnostics
+          name: Morrowind-build-diagnostics
           path: |
-            bootstrap.log
-            ios-build.log
-            source/build/
+            logs/
+            build/ios/
           if-no-files-found: warn
+          retention-days: 7
