@@ -13,41 +13,42 @@ jobs:
     timeout-minutes: 360
 
     steps:
-      - name: Checkout workflow repository
-        uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v5
 
-      - name: Checkout OpenMW iOS source
+      - name: Clone OpenMW iOS
         run: |
           git clone https://gitlab.com/duron27/openmw_ios.git source
 
       - name: Set up Java
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: '17'
 
-      - name: Check build tools
+      - name: Check tools
         run: |
           xcodebuild -version
           cmake --version
-          git --version
+          java -version
 
-      - name: Make Gradle executable
-        working-directory: source
-        run: chmod +x gradlew
-
-      - name: Build OpenMW for iPhone
+      - name: Check project files
         working-directory: source
         run: |
-          ./gradlew :composeApp:buildNativeIosDevice \
-            --stacktrace \
-            --info
+          ls -la
+          ls -la scripts || true
+          find . -maxdepth 3 -name '*.xcodeproj' -o -name 'build-ios.sh'
 
-      - name: Save build diagnostics
+      - name: Build iOS
+        working-directory: source
+        run: |
+          chmod +x gradlew
+          ./gradlew :composeApp:buildNativeIosDevice --stacktrace --info
+
+      - name: Upload diagnostics
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
-          name: Morrowind-iOS-build-logs
-          path: |
-            source/composeApp/build/
+          name: build-logs
+          path: source/composeApp/build/
           if-no-files-found: warn
