@@ -7,6 +7,9 @@ on:
     branches:
       - main
 
+permissions:
+  contents: read
+
 jobs:
   build:
     runs-on: macos-15
@@ -16,39 +19,47 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v5
 
-      - name: Clone OpenMW iOS
+      - name: Install dependencies
+        run: |
+          brew install cmake ninja autoconf automake libtool pkg-config
+
+      - name: Clone OpenMW iOS source
         run: |
           git clone https://gitlab.com/duron27/openmw_ios.git source
 
-      - name: Set up Java
-        uses: actions/setup-java@v6
-        with:
-          distribution: temurin
-          java-version: '17'
-
-      - name: Check tools
-        run: |
-          xcodebuild -version
-          cmake --version
-          java -version
-
-      - name: Check project files
+      - name: Check source files
         working-directory: source
         run: |
           ls -la
-          ls -la scripts || true
-          find . -maxdepth 3 -name '*.xcodeproj' -o -name 'build-ios.sh'
+          test -f scripts/bootstrap.sh
+          test -f scripts/build-ios.sh
 
-      - name: Build iOS
+      - name: Bootstrap dependencies
         working-directory: source
         run: |
-          chmod +x gradlew
-          ./gradlew :composeApp:buildNativeIosDevice --stacktrace --info
+          chmod +x scripts/*.sh
+          set -o pipefail
+          ./scripts/bootstrap.sh 2>&1 | tee ../bootstrap.log
+
+      - name: Build iOS project
+        working-directory: source
+        run: |
+          set -o pipefail
+          ./scripts/build-ios.sh 2>&1 | tee ../ios-build.log
+
+      - name: Check generated Xcode project
+        working-directory: source
+        run: |
+          xcodebuild -list \
+            -project build/ios/OpenMW.xcodeproj
 
       - name: Upload diagnostics
         if: always()
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
-          name: build-logs
-          path: source/composeApp/build/
+          name: Morrowind-iOS-diagnostics
+          path: |
+            bootstrap.log
+            ios-build.log
+            source/build/
           if-no-files-found: warn
